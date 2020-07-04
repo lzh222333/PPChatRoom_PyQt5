@@ -15,9 +15,10 @@ db = pymysql.connect(host=config[0].strip(),port=int(config[1].strip()),user=con
 cur = db.cursor()
 
 def send_online_usr(conn):
-    msg=[ALL_ONLINE_USR]
-    for name,nickname in online_user.items():
-        msg.append([name,nickname])
+    msg=[ALL_ONLINE_USR,[]]
+    for name,nickname in active_user.items():
+        msg[1].append(name)
+    print(msg)
     send(msg,conn)
 
 def join(name,conn):

@@ -26,8 +26,7 @@ class ClientHandler(QThread):
 
     def join(self,name):
         msg=[USR_JOIN,name]
-        jmsg = json.dumps(msg)
-        conn.send(jmsg.encode("utf-8"))
+        send(msg,conn)
 
     def register(self,name,password,nickname):
         password=md5_key(md5_key(password))

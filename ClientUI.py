@@ -1,6 +1,7 @@
 import sys
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QLineEdit, QInputDialog, QTreeWidgetItem, QTreeWidget, QTextEdit, QFontComboBox, QTextBrowser, \
+from PyQt5.QtCore import Qt,pyqtSlot,QDateTime
+from PyQt5.QtGui import QColor, QTextCharFormat,QTextCursor
+from PyQt5.QtWidgets import QMessageBox, QLabel, QLineEdit, QInputDialog, QTreeWidgetItem, QTreeWidget, QTextEdit, QFontComboBox, QTextBrowser, \
     QPushButton, QWidget, QApplication, QVBoxLayout, QHBoxLayout
 from ClientHandler import *
 
@@ -11,10 +12,12 @@ class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("登陆界面")
-        self.resize(650, 225)
+        self.resize(550, 225)
         self.Co_Width = 40
         self.Co_Heigth = 20
         self.setup_ui()
+        self.lab_nickname.setVisible(False)
+        self.Lin_nickname.setVisible(False)
         #self.handler = handler
 
     def setup_ui(self):
@@ -51,39 +54,29 @@ class LoginWindow(QWidget):
         self.Pu_register.move(self.Lin_nickname.x() + self.Lin_nickname.width(), self.lab_nickname.y() + self.lab_nickname.width())
 
     def login(self):
-        myname = self.Lin_usrname.text()
+        global myname
+        name = self.Lin_usrname.text()
         password = self.Lin_pword.text()
-        if handler.login(myname,password):
-            handler.join(myname)
+        if handler.login(name,password):
+            handler.join(name)
+            myname=name
             self.close()
         else:
+            QMessageBox.warning(self, "警告", "登录失败！", QMessageBox.Ok)
             print("登录失败！")
 
     def register(self):
-        myname = self.Lin_usrname.text()
+        global myname
+        name = self.Lin_usrname.text()
         password = self.Lin_pword.text()
-        nickname =  self.Lin_nickname.text()
-        if handler.register(myname,password,nickname):
-            handler.join(myname)
+        #nickname =  self.Lin_nickname.text()
+        if handler.register(name,password,":"):
+            handler.join(name)
+            myname=name
             self.close()
         else:
+            QMessageBox.warning(self, "警告", "注册失败！", QMessageBox.Ok)
             print("注册失败！")
-
-    # def fin(self,msg):
-    #     type = msg[0]
-    #     if type == ALL_CORRECT:
-    #         print("登录/注册成功！！")
-    #         self.close()
-    #     elif type == USR_NAME_ERROR:
-    #         self.Lin_usrname.setText("")
-    #         self.Lin_pword.setText("")
-    #         print("不存在用户名！！")
-    #     elif type == USR_PW_ERROR:
-    #         self.Lin_pword.setText("")
-    #         print("密码错误！！")
-    #     elif type == USR_NAME_EXIST:
-    #         self.Lin_usrname.setText("")
-    #         print("用户名已存在！！")
 
 class ClientUI(QWidget):
 
@@ -96,7 +89,9 @@ class ClientUI(QWidget):
         # 聊天窗口
         self.messageBrowser = QTextBrowser()
         # 字体选择
-        self.fontCombo = QFontComboBox()
+        self.fontComboBox = QFontComboBox()
+        self.fontComboBox.setObjectName("fontComboBox")
+        self.fontComboBox.currentFontChanged.connect(self.on_fontComboBox_currentFontChanged)
 
         # 发送按钮
         self.sendButton = QPushButton('发送')
@@ -104,7 +99,7 @@ class ClientUI(QWidget):
 
         # 发送功能横向布局
         functionboxLayout = QHBoxLayout()
-        functionboxLayout.addWidget(self.fontCombo)
+        functionboxLayout.addWidget(self.fontComboBox)
         functionboxLayout.addStretch(1)
         functionboxLayout.addWidget(self.sendButton)
 
@@ -116,6 +111,9 @@ class ClientUI(QWidget):
         vhoxLayout_left.addWidget(self.messageBrowser)
         vhoxLayout_left.addLayout(functionboxLayout)
         vhoxLayout_left.addWidget(self.messageEdit)
+        vhoxLayout_left.setStretch(0, 4)
+        vhoxLayout_left.setStretch(1, 1)
+        vhoxLayout_left.setStretch(2, 2)
 
         # 在线用户列表
         self.userView = QTreeWidget()
@@ -137,40 +135,70 @@ class ClientUI(QWidget):
 
         self.show()
 
+    def mergeFormatDocumentOrSelection(self, format):
+        cursor = self.messageEdit.textCursor()
+        if not cursor.hasSelection():
+            cursor.select(QTextCursor.Document)
+        cursor.mergeCharFormat(format)
+        self.messageEdit.mergeCurrentCharFormat(format)
+
+    def on_fontComboBox_currentFontChanged(self, p0):
+        fmt = QTextCharFormat()
+        fmt.setFont(p0)
+        #fmt.setFontFamily(p0)
+        self.mergeFormatDocumentOrSelection(fmt)
+        self.messageEdit.setFocus()
+
+    def getMessage(self):
+
+        msg = self.messageEdit.toHtml()
+        self.messageEdit.clear()
+        self.messageEdit.setFocus()
+        return msg
+
     def sendChatMsg(self):
-        sendMsg(ALL_MSG, self.messageEdit.toPlainText(), myname)
+        sendMsg(ALL_MSG, self.getMessage(), myname)
         self.messageEdit.clear()
 
     def showMsg(self, msg, name):
-
+        time = QDateTime.currentDateTime().toString("yyyy-MM-dd hh:mm:ss")
         if (name != myname):
-            self.messageBrowser.append('<p align="left" style="color:blue">' + name+':'+msg + '</p>')
-            self.messageBrowser.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            self.messageBrowser.setTextColor(Qt.blue)
+            self.messageBrowser.append("[" + name + "] " + time)
+            self.messageBrowser.append(msg)
         else:
-            self.messageBrowser.append('<p align="right" style="color:red">' +msg+':我' + '</p>')
-            self.messageBrowser.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.messageBrowser.setTextColor(Qt.red)
+            self.messageBrowser.append("[我] " + time)
+            self.messageBrowser.append(msg)
 
     def addUserNode(self, group, name):
+        self.userView.expandAll()
         newUser = QTreeWidgetItem(group)
         newUser.setText(0, name)
+        if(name==myname):
+            newUser.setBackground(0,QColor('#ABAEEE'))
 
     def removeUserNode(self, name):
-        print(name)
-        findItem = self.userView.findItems(name, Qt.MatchExactly)
-        print(findItem)
-        if findItem:
-            self.userView.removeRow(findItem[0].row())
+        n = self.userView_online_node.childCount()
+        for i in range(n):
+            if self.userView_online_node.child(i).text(0)==name:
+                self.userView_online_node.removeChild(self.userView_online_node.child(i))
+                break
 
     def userJoin(self, name):
-        self.messageBrowser.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.messageBrowser.append('<div align="center" style="color:grey">系统消息：' + name + '上线了</div>')
+        self.messageBrowser.setTextColor(Qt.gray)
+        self.messageBrowser.append('系统消息：' + name + '上线了')
+
+        #self.messageBrowser.append('<div align="center" style="color:grey">系统消息：' + name + '上线了</div>')
         self.addUserNode(self.userView_online_node, name)
 
     def userLeft(self, name):
-        self.messageBrowser.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        self.messageBrowser.append('<p align="center" style="text-align:center;color:grey">系统消息：' + name + '离开了</p>')
+        self.messageBrowser.setTextColor(Qt.gray)
+        self.messageBrowser.append('系统消息：' + name + '离开了')
+
+        #<p align="center" style="text-align:center;color:grey">
         self.removeUserNode(name)
-        print(str(self.messageBrowser.toHtml()))
+        #print(str(self.messageBrowser.toHtml()))
 
     def setHandler(self, handler):
         self.handler = handler
@@ -183,6 +211,10 @@ class ClientUI(QWidget):
             self.userJoin(msg[1])
         elif type == USR_LEFT:
             self.userLeft(msg[1])
+        elif type == ALL_ONLINE_USR:
+            for i in msg[1]:
+                self.userJoin(i)
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
