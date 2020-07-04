@@ -7,7 +7,7 @@ USR_LOGIN = 5
 ALL_ONLINE_USR = 6
 
 
-HOST = '192.168.23.1'
+HOST = '192.168.30.1'
 PORT = 8001
 
 def send(msg,conn):
