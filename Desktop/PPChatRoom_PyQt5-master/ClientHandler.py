@@ -46,6 +46,21 @@ class ClientHandler(QThread):
             pass
         return self.issuc
 
+    def pai_yi_pai(self,name,toname):
+        #print(name,toname)
+        msg=[PAI_YI_PAI,name,toname]
+        send(msg,conn)
+
+    def delete_user(self,name):
+        print(name)
+        msg=[DELETE_USR,name]
+        send(msg,conn)
+
+    def announcement(self,text):
+        print(text)
+        msg=[ANNOUNCEMENT,text]
+        send(msg,conn)
+
     def run(self):
         while True:
             data = conn.recv(1024)

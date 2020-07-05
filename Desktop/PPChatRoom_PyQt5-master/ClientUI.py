@@ -1,13 +1,14 @@
 import sys
 from PyQt5.QtCore import Qt,pyqtSlot,QDateTime, QCoreApplication, QSize, QFileInfo
-from PyQt5.QtGui import QColor, QTextCharFormat,QTextCursor, QIcon, QPixmap, QFont
-from PyQt5.QtWidgets import QMessageBox, QLabel, QLineEdit, QInputDialog, QTreeWidgetItem, QTreeWidget, QTextEdit, QFontComboBox, QTextBrowser, \
+from PyQt5.QtGui import QColor, QTextCharFormat,QTextCursor, QIcon, QPixmap, QFont,QCursor
+from PyQt5.QtWidgets import QMenu,QMessageBox, QLabel, QLineEdit, QInputDialog, QTreeWidgetItem, QTreeWidget, QTextEdit, QFontComboBox, QTextBrowser, \
     QPushButton, QWidget, QApplication, QVBoxLayout, QHBoxLayout, QComboBox, QToolButton, QColorDialog
 from ClientHandler import *
 
 myname = ""
 handler = ClientHandler()
-
+admin = 0
+app = QApplication(sys.argv)
 class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -54,10 +55,11 @@ class LoginWindow(QWidget):
         self.Pu_register.move(self.Lin_nickname.x() + self.Lin_nickname.width(), self.lab_nickname.y() + self.lab_nickname.width())
 
     def login(self):
-        global myname
+        global myname,admin
         name = self.Lin_usrname.text()
         password = self.Lin_pword.text()
-        if handler.login(name,password):
+        issuc = handler.login(name,password)
+        if issuc:
             handler.join(name)
             myname=name
             self.close()
@@ -191,11 +193,24 @@ class ClientUI(QWidget):
         self.userView.setHeaderLabels(["用户列表"])
         self.userView_online_node = QTreeWidgetItem(self.userView)
         self.userView_online_node.setText(0, "在线用户")
-        # self.addUserNode(self.userView_online_node)
+        self.userView_all_node = QTreeWidgetItem(self.userView)
+        self.userView_all_node.setText(0, "所有用户")
+        self.userView.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.userView.customContextMenuRequested.connect(self.userView_menu)
+
+        #公共栏Label
+        self.announcement_label = QLabel()
+        self.announcement_label.setText("公告栏")
+
+        #公告栏
+        self.announcement_edit = QTextEdit()
+        self.announcement_edit.setEnabled(False)
 
         # 左侧竖向布局，一整块
         vhoxLayout_right = QVBoxLayout()
         vhoxLayout_right.addWidget(self.userView)
+        vhoxLayout_right.addWidget(self.announcement_label)
+        vhoxLayout_right.addWidget(self.announcement_edit)
 
         # 最大布局，横向两列
         hboxLayout = QHBoxLayout(self)
@@ -205,6 +220,20 @@ class ClientUI(QWidget):
         hboxLayout.setStretch(1, 1)
 
         self.show()
+
+    def update_admin_UI(self):
+        self.announcement_edit.setEnabled(True)
+        self.announcement_edit.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.announcement_edit.customContextMenuRequested.connect(lambda :handler.announcement(self.announcement_edit.toPlainText()))
+
+    def userView_menu(self):
+        item = self.userView.currentItem()
+        menu = QMenu(self.userView)
+        if item.parent().text(0)=='在线用户':
+            menu.addAction('拍一拍').triggered.connect(lambda :handler.pai_yi_pai(myname,item.text(0)))
+        elif admin:
+            menu.addAction('删除').triggered.connect(lambda :handler.delete_user(item.text(0)))
+        menu.exec_(QCursor.pos())
 
     def mergeFormatDocumentOrSelection(self, format):
 
@@ -256,7 +285,6 @@ class ClientUI(QWidget):
         self.mergeFormatDocumentOrSelection(fmt)
         self.messageEdit.setFocus()
 
-
     def getMessage(self):
         msg = self.messageEdit.toHtml()
         self.messageEdit.clear()
@@ -292,25 +320,34 @@ class ClientUI(QWidget):
                 self.userView_online_node.removeChild(self.userView_online_node.child(i))
                 break
 
+    def removeAllNode(self, name):
+        n = self.userView_all_node.childCount()
+        for i in range(n):
+            if self.userView_all_node.child(i).text(0)==name:
+                self.userView_all_node.removeChild(self.userView_all_node.child(i))
+                break
+
     def userJoin(self, name):
         self.messageBrowser.setTextColor(Qt.gray)
         self.messageBrowser.append('系统消息：' + name + '上线了')
-
-        #self.messageBrowser.append('<div align="center" style="color:grey">系统消息：' + name + '上线了</div>')
         self.addUserNode(self.userView_online_node, name)
 
     def userLeft(self, name):
         self.messageBrowser.setTextColor(Qt.gray)
         self.messageBrowser.append('系统消息：' + name + '离开了')
-
-        #<p align="center" style="text-align:center;color:grey">
         self.removeUserNode(name)
-        #print(str(self.messageBrowser.toHtml()))
+
+    def pai_yi_pai(self,name,toname):
+        self.messageBrowser.setTextColor(Qt.gray)
+        self.messageBrowser.append(name+' 拍了拍 ' + toname)
+        if toname==myname:
+            app.alert(self,2000)
 
     def setHandler(self, handler):
         self.handler = handler
 
     def handler(self, msg):
+        global admin
         type = msg[0]
         if type == ALL_MSG:
             self.showMsg(msg[1], msg[2])
@@ -318,13 +355,27 @@ class ClientUI(QWidget):
             self.userJoin(msg[1])
         elif type == USR_LEFT:
             self.userLeft(msg[1])
+        elif type == USR_LOGIN:
+            admin = msg[2]
+            if admin:
+                self.update_admin_UI()
         elif type == ALL_ONLINE_USR:
             for i in msg[1]:
                 self.userJoin(i)
+            self.announcement_edit.setText(msg[2])
+            for i in msg[3]:
+                self.addUserNode(self.userView_all_node,i)
+        elif type == PAI_YI_PAI:
+            self.pai_yi_pai(msg[1],msg[2])
+        elif type == ANNOUNCEMENT:
+            self.announcement_edit.setText(msg[1])
+        elif type == DELETE_USR:
+            self.removeUserNode(msg[1])
+            self.removeAllNode(msg[1])
 
 
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
+
     widget = ClientUI()
     conn.connect((HOST, PORT))
     loginwindow=LoginWindow()

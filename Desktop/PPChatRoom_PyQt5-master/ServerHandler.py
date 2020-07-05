@@ -35,20 +35,28 @@ class ServerHandler(socketserver.BaseRequestHandler):
                     continue
                 #用户登录
                 elif(msg[0]==USR_LOGIN):
-                    #注册成功
-                    if ServerMain.user_login(msg[1],msg[2]):
+                    #登录成功
+                    issuc,admin=ServerMain.user_login(msg[1],msg[2])
+                    if issuc:
                         print(msg[1],"登录成功")
-                        msg=[USR_LOGIN,1]
+                        msg=[USR_LOGIN,1,admin]
                         send(msg,conn)
-                    #注册失败
+                    #登录失败
                     else:
                         print(msg[1],"登录失败")
-                        msg=[USR_LOGIN,0]
+                        msg=[USR_LOGIN,0,0]
                         send(msg,conn)
                     #不广播
                     continue
                 elif(msg[0]==ALL_ONLINE_USR):
                     ServerMain.send_online_usr(conn)
+                elif(msg[0]==PAI_YI_PAI):
+                    pass
+                elif(msg[0]==ANNOUNCEMENT):
+                    ServerMain.announcement=msg[1]
+                    pass
+                elif(msg[0]==DELETE_USR):
+                    ServerMain.delete_user(msg[1])
 
                 ServerMain.sendToALL(data,conn)
             except ConnectionResetError as e:
